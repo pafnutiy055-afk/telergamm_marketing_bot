@@ -1,9 +1,4 @@
-from google.colab import drive
-drive.mount('/content/drive')
 import os
-
-project_dir = '/content/drive/MyDrive/TELEGRAMM BOT'
-
 # Create the directory if it doesn't exist
 if not os.path.exists(project_dir):
     os.makedirs(project_dir)
@@ -83,7 +78,7 @@ async def cmd_start(message: types.Message):
     await message.answer(formatted, parse_mode="Markdown")
 
     # Отправка файла (проверьте путь)
-    guide_path = "/content/drive/MyDrive/TELEGRAMM BOT/marketing_manual.pdf"
+guide_path = "files/marketing_manual.pdf"
     if os.path.exists(guide_path):
         document = FSInputFile(guide_path)
         await message.answer_document(document=document, caption="Вот твой мини-гайд 📖")
