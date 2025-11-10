@@ -7,7 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton  # ← добавлен импорт кнопок
 
 # --- Настройка токена ---
-bot = Bot(token=os.getenv("TELEGRAM_TOKEN"))  # можно заменить на строку токена
+bot = Bot(token="8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0")  # строка токена в кавычках
 dp = Dispatcher()
 
 # --- Обработчик /start ---
