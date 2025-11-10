@@ -1,11 +1,4 @@
 import os
-# Create the directory if it doesn't exist
-if not os.path.exists(project_dir):
-    os.makedirs(project_dir)
-    print(f"Directory '{project_dir}' created.")
-else:
-    print(f"Directory '{project_dir}' already exists.")
-
 # You can now use 'project_dir' as the base path for saving your project files.
 import os
 import asyncio
