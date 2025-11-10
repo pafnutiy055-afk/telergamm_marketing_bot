@@ -74,11 +74,10 @@ def format_for_telegram_markdown(text: str) -> str:
 async def cmd_start(message: types.Message):
     # Форматируем и отправляем текст
     formatted = format_for_telegram_markdown(welcome_text)
-    # Если в тексте есть символы, которые мешают Markdown — можно использовать parse_mode='HTML' и <b>...</b>
     await message.answer(formatted, parse_mode="Markdown")
 
     # Отправка файла (проверьте путь)
-guide_path = "files/marketing_manual.pdf"
+    guide_path = "files/marketing_manual.pdf"  # <-- здесь внутри функции
     if os.path.exists(guide_path):
         document = FSInputFile(guide_path)
         await message.answer_document(document=document, caption="Вот твой мини-гайд 📖")
@@ -97,6 +96,7 @@ guide_path = "files/marketing_manual.pdf"
         "Также мы подготовили обучающее видео, как запустить свою первую рекламную кампанию. Смотри его прямо сейчас 👇",
         reply_markup=kb
     )
+
 # --- Запуск бота ---
 async def main():
     await dp.start_polling(bot)
