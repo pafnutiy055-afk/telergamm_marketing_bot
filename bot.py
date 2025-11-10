@@ -70,7 +70,7 @@ async def cmd_start(message: types.Message):
     await message.answer(formatted, parse_mode="Markdown")
 
     # Отправка файла (проверьте путь)
-    guide_path = "files/telergamm_marketing_bot/marketing_manual.pdf"  # <-- здесь внутри функции
+    guide_path = "marketing_manual.pdf"  # <-- здесь внутри функции
     if os.path.exists(guide_path):
         document = FSInputFile(guide_path)
         await message.answer_document(document=document, caption="Вот твой мини-гайд 📖")
