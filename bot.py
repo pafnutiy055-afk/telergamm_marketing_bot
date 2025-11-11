@@ -69,7 +69,7 @@ async def cmd_start(message: types.Message):
 
     # Кнопка "📘 Отправить мануал"
     manual_button = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📘 Отправить мануал", callback_data="send_manual")]
+        [InlineKeyboardButton(text="📘 Получить мануал", callback_data="send_manual")]
     ])
     await message.answer("Готов получить свой первый подарок? 👇", reply_markup=manual_button)
 
@@ -77,7 +77,7 @@ async def cmd_start(message: types.Message):
 # --- Обработка нажатия кнопки "Отправить мануал" ---
 @dp.callback_query(F.data == "send_manual")
 async def send_manual(callback: types.CallbackQuery):
-    guide_path = os.path.join(os.path.dirname(__file__), "files", "marketing_manual.pdf")
+    guide_path = "marketing_manual.pdf"
 
     if os.path.exists(guide_path):
         document = FSInputFile(guide_path)
@@ -87,7 +87,7 @@ async def send_manual(callback: types.CallbackQuery):
 
     # После отправки мануала — кнопка на видео
     video_button = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎥 Отправить видео", callback_data="send_video")]
+        [InlineKeyboardButton(text="🎥 Получить видео", callback_data="send_video")]
     ])
     await callback.message.answer("Хочешь посмотреть обучающее видео? 👇", reply_markup=video_button)
 
