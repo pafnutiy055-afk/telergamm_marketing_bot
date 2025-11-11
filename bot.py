@@ -1,16 +1,14 @@
 import os
-# You can now use 'project_dir' as the base path for saving your project files.
-import os
 import asyncio
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton  # ← добавлен импорт кнопок
+from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 
 # --- Настройка токена ---
-bot = Bot(token="8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0")  # строка токена в кавычках
+bot = Bot(token="8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0")  # твой токен
 dp = Dispatcher()
 
-# --- Обработчик /start ---
+# --- Текст приветствия ---
 welcome_text = (
     "Привет! 👋\n"
     "Это Артем и команда Foton Plus.\n\n"
@@ -27,7 +25,7 @@ welcome_text = (
 
 
 def format_for_telegram_markdown(text: str) -> str:
-    """Один раз — форматируем под Markdown (звёздочки/цитаты)."""
+    """Форматирование текста под Markdown."""
     lines = text.splitlines()
 
     bold_full_lines = {
@@ -63,38 +61,58 @@ def format_for_telegram_markdown(text: str) -> str:
     return "\n".join(lines)
 
 
+# --- Обработчик /start ---
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    # Форматируем и отправляем текст
     formatted = format_for_telegram_markdown(welcome_text)
     await message.answer(formatted, parse_mode="Markdown")
 
-    # Отправка файла (проверьте путь)
-    guide_path = "marketing_manual.pdf"  # <-- здесь внутри функции
+    # Кнопка "📘 Отправить мануал"
+    manual_button = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📘 Отправить мануал", callback_data="send_manual")]
+    ])
+    await message.answer("Готов получить свой первый подарок? 👇", reply_markup=manual_button)
+
+
+# --- Обработка нажатия кнопки "Отправить мануал" ---
+@dp.callback_query(F.data == "send_manual")
+async def send_manual(callback: types.CallbackQuery):
+    guide_path = os.path.join(os.path.dirname(__file__), "files", "marketing_manual.pdf")
+
     if os.path.exists(guide_path):
         document = FSInputFile(guide_path)
-        await message.answer_document(document=document, caption="Вот твой мини-гайд 📖")
+        await callback.message.answer_document(document=document, caption="Вот твой мини-гайд 📖")
     else:
-        await message.answer("❌ К сожалению, файл гайда не найден.")
+        await callback.message.answer("❌ К сожалению, файл гайда не найден.")
 
-    # Отправляем кнопку на видео
+    # После отправки мануала — кнопка на видео
+    video_button = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎥 Отправить видео", callback_data="send_video")]
+    ])
+    await callback.message.answer("Хочешь посмотреть обучающее видео? 👇", reply_markup=video_button)
+
+
+# --- Обработка нажатия кнопки "Отправить видео" ---
+@dp.callback_query(F.data == "send_video")
+async def send_video(callback: types.CallbackQuery):
     VIDEO_URL = "https://youtu.be/P-3NZnicpbk"
-    kb = InlineKeyboardMarkup(inline_keyboard=[
+    video_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="🎥 Смотреть урок — Запуск рекламной кампании в Яндекс Директ",
             url=VIDEO_URL
         )]
     ])
-    await message.answer(
+    await callback.message.answer(
         "Также мы подготовили обучающее видео, как запустить свою первую рекламную кампанию. Смотри его прямо сейчас 👇",
-        reply_markup=kb
+        reply_markup=video_kb
     )
+
 
 # --- Запуск бота ---
 async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
+
 
