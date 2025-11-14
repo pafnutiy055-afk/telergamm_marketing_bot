@@ -5,8 +5,12 @@ from aiogram.filters import Command
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 
 # --- Настройка токена ---
-bot = Bot(token="8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0")  # твой токен
+BOT_TOKEN = "8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0"  # твой токен
 dp = Dispatcher()
+bot = Bot(token=BOT_TOKEN)
+
+# --- Чат для уведомлений ---
+NOTIFY_CHAT_ID = -1003322951241
 
 # --- Текст приветствия ---
 welcome_text = (
@@ -22,7 +26,6 @@ welcome_text = (
     "🎁 Первый подарок: бесплатный мини-гайд и обучающее видео по маркетингу, которые мы подготовили специально для тебя.\n"
     "⚡️ Совет от команды Foton Plus: изучай материалы, применяй их на практике и возвращайся к гайду снова — так результат будет быстрее."
 )
-
 
 def format_for_telegram_markdown(text: str) -> str:
     """Форматирование текста под Markdown."""
@@ -73,8 +76,12 @@ async def cmd_start(message: types.Message):
     ])
     await message.answer("Готов получить свой первый подарок? 👇", reply_markup=manual_button)
 
+    # --- Отправка уведомления в чат ---
+    username_display = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
+    await bot.send_message(NOTIFY_CHAT_ID, f"✅ Пользователь стартанул бота: {username_display} (ID: {message.from_user.id})")
 
-# --- Обработка нажатия кнопки "Отправить мануал" ---
+
+# --- Обработка кнопки "Отправить мануал" ---
 @dp.callback_query(F.data == "send_manual")
 async def send_manual(callback: types.CallbackQuery):
     guide_path = "marketing_manual.pdf"
@@ -92,7 +99,7 @@ async def send_manual(callback: types.CallbackQuery):
     await callback.message.answer("Хочешь посмотреть обучающее видео? 👇", reply_markup=video_button)
 
 
-# --- Обработка нажатия кнопки "Отправить видео" ---
+# --- Обработка кнопки "Отправить видео" ---
 @dp.callback_query(F.data == "send_video")
 async def send_video(callback: types.CallbackQuery):
     VIDEO_URL = "https://youtu.be/P-3NZnicpbk"
@@ -107,6 +114,10 @@ async def send_video(callback: types.CallbackQuery):
         reply_markup=video_kb
     )
 
+    # --- Отправка уведомления в чат ---
+    username_display = f"@{callback.from_user.username}" if callback.from_user.username else callback.from_user.full_name
+    await bot.send_message(NOTIFY_CHAT_ID, f"🎬 Пользователь посмотрел видео: {username_display} (ID: {callback.from_user.id})")
+
 
 # --- Запуск бота ---
 async def main():
@@ -114,5 +125,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
