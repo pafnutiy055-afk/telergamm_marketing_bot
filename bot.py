@@ -8,7 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # ----------------- Настройки -----------------
 BOT_TOKEN = "8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0"
-NOTIFY_CHAT_ID = -1003322951241  # чат уведомлений
+NOTIFY_CHAT_ID = -1003322951241
 VIDEO_URL = "https://youtu.be/P-3NZnicpbk"
 MANUAL_FILE = "marketing_manual.pdf"
 CHECKLIST_FILE = "check_list.pdf"
@@ -34,7 +34,7 @@ def kb_start_quiz():
         [InlineKeyboardButton("🧠 Начать квиз", callback_data="start_quiz")]
     ])
 
-# Вопросы для квиза
+# ----------------- Вопросы для квиза -----------------
 QUIZ_QUESTIONS: List[Dict[str, Any]] = [
     {"text": "1) Какая у тебя ниша?", "opts": ["Услуги", "Товары", "Онлайн-школа", "Другое"]},
     {"text": "2) Какую цель ставишь для кампании?", "opts": ["Лиды", "Продажи", "Трафик", "Повышение узнаваемости"]},
@@ -63,8 +63,6 @@ async def cmd_start(message: types.Message):
         "⚡️ Совет: изучай шаг за шагом и начинай запускать кампании уже сегодня."
     )
     await message.answer(greeting)
-
-    # уведомление только о старте
     await bot.send_message(NOTIFY_CHAT_ID, f"✅ {get_username_display(message.from_user)} запустил бота (ID: {user_id})")
 
     # выдаём материалы по очереди с задержкой 10 секунд
@@ -78,16 +76,17 @@ async def cmd_start(message: types.Message):
         await message.answer_document(FSInputFile(KPI_FILE), caption="📊 Таблица KPI для анализа кампаний")
         await asyncio.sleep(10)
 
-    # отправка видео с кнопкой
+    # видео через 10 секунд после KPI
+    await asyncio.sleep(10)
     await message.answer(
         "🎥 Отлично! Теперь пора применить знания на практике.\n"
-        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» "
+        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» (26 минут) "
         "и научись быстро привлекать лидов и контролировать бюджет.",
         reply_markup=kb_get_video()
     )
     users_state[user_id]["step"] = "materials_sent"
 
-# ----------------- Отложенное сообщение -----------------
+# ----------------- Остальной код без изменений -----------------
 async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECONDS):
     try:
         await asyncio.sleep(delay_seconds)
@@ -106,13 +105,11 @@ async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECO
     except Exception:
         pass
 
-# ----------------- Команда "жопа" -----------------
 @dp.message()
 async def skip_timer_or_handle_text(message: types.Message):
     text = message.text.strip().lower()
     user_id = message.from_user.id
     ensure_user_state(user_id)
-
     if text == "жопа":
         task = users_state[user_id].get("timer_task")
         if task and not task.done():
@@ -126,7 +123,6 @@ async def skip_timer_or_handle_text(message: types.Message):
             pass
         return
 
-# ----------------- Квиз -----------------
 @dp.callback_query(lambda c: c.data == "start_quiz")
 async def cb_start_quiz(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -153,11 +149,9 @@ async def cb_quiz_answer(callback: CallbackQuery):
     user_id = callback.from_user.id
     st = users_state.get(user_id)
     if not st: return
-
     parts = callback.data.split("_")
     if len(parts) != 3: return
     q_index, opt_index = int(parts[1]), int(parts[2])
-
     quiz = st["quiz"]
     while len(quiz["answers"]) <= q_index:
         quiz["answers"].append(None)
@@ -170,8 +164,6 @@ async def finalize_quiz(user_id: int):
     st = users_state.get(user_id)
     if not st: return
     st["quiz_done"] = True
-
-    # Trigger message → переход к менеджеру
     trigger_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{SELLER_USERNAME.lstrip('@')}")]
     ])
@@ -181,11 +173,8 @@ async def finalize_quiz(user_id: int):
         "Свяжись с менеджером для разбора кампании и подготовки эффективного плана.",
         reply_markup=trigger_kb
     )
-
-    # уведомление только о переходе к менеджеру
     await bot.send_message(NOTIFY_CHAT_ID, f"🟢 Пользователь {user_id} перешёл к менеджеру {SELLER_USERNAME}")
 
-# ----------------- Запуск -----------------
 async def main():
     print("🤖 Бот запущен и готов.")
     await dp.start_polling(bot)
