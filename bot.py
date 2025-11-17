@@ -45,7 +45,13 @@ QUIZ_QUESTIONS: List[Dict[str, Any]] = [
 # ----------------- Утилиты -----------------
 def ensure_user_state(user_id: int):
     if user_id not in users_state:
-        users_state[user_id] = {"step": "started", "timer_task": None, "quiz": {"q_index": 0, "answers": []}}
+        users_state[user_id] = {
+            "step": "started",
+            "timer_task": None,
+            "quiz": {"q_index": 0, "answers": []},
+            "delayed_sent": False,
+            "quiz_done": False
+        }
 
 def get_username_display(user: types.User) -> str:
     return f"@{user.username}" if user.username else user.full_name
@@ -59,34 +65,34 @@ async def cmd_start(message: types.Message):
     greeting = (
         "Привет! 👋\nЭто Артем и команда Foton Plus.\n\n"
         "Добро пожаловать в образовательное пространство по маркетингу! 🎯\n"
-        "🎁 Мы подготовили для тебя полезный набор материалов, чтобы сразу применить их на практике.\n"
-        "⚡️ Совет: изучай шаг за шагом и начинай запускать кампании уже сегодня."
+        "🎁 Мы подготовили для тебя набор материалов, чтобы сразу применить их на практике.\n"
+        "⚡️ Совет: изучай пошагово и запускай кампании уже сегодня!"
     )
     await message.answer(greeting)
     await bot.send_message(NOTIFY_CHAT_ID, f"✅ {get_username_display(message.from_user)} запустил бота (ID: {user_id})")
 
-    # выдаём материалы по очереди с задержкой 10 секунд
+    # ----------------- Отправка материалов с задержкой -----------------
     if os.path.exists(MANUAL_FILE):
         await message.answer_document(FSInputFile(MANUAL_FILE), caption="📘 Мини-мануал — стартовый материал")
         await asyncio.sleep(10)
+
     if os.path.exists(CHECKLIST_FILE):
         await message.answer_document(FSInputFile(CHECKLIST_FILE), caption="📑 Чек-лист: проверка рекламной кампании")
         await asyncio.sleep(10)
+
     if os.path.exists(KPI_FILE):
         await message.answer_document(FSInputFile(KPI_FILE), caption="📊 Таблица KPI для анализа кампаний")
         await asyncio.sleep(10)
 
-    # видео через 10 секунд после KPI
-    await asyncio.sleep(10)
+    # ----------------- Видео сразу после KPI -----------------
     await message.answer(
         "🎥 Отлично! Теперь пора применить знания на практике.\n"
-        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» (26 минут) "
-        "и научись быстро привлекать лидов и контролировать бюджет.",
+        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» и научись быстро привлекать лидов и контролировать бюджет.",
         reply_markup=kb_get_video()
     )
     users_state[user_id]["step"] = "materials_sent"
 
-# ----------------- Остальной код без изменений -----------------
+# ----------------- Таймер и отложенное сообщение -----------------
 async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECONDS):
     try:
         await asyncio.sleep(delay_seconds)
@@ -94,7 +100,7 @@ async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECO
         return
 
     st = users_state.get(user_id)
-    if st is None or st.get("delayed_sent") or st.get("quiz_done"):
+    if not st or st.get("delayed_sent") or st.get("quiz_done"):
         return
 
     try:
@@ -105,24 +111,27 @@ async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECO
     except Exception:
         pass
 
+# ----------------- Команда "жопа" -----------------
 @dp.message()
 async def skip_timer_or_handle_text(message: types.Message):
     text = message.text.strip().lower()
     user_id = message.from_user.id
     ensure_user_state(user_id)
+
     if text == "жопа":
         task = users_state[user_id].get("timer_task")
         if task and not task.done():
             task.cancel()
         try:
             await bot.send_message(user_id,
-                                   "⏰ (Тест) Хочешь разбор твоей рекламной кампании?",
+                                   "⏰ Таймер пропущен! Хочешь разбор твоей рекламной кампании?",
                                    reply_markup=kb_start_quiz())
             users_state[user_id]["delayed_sent"] = True
         except Exception:
             pass
         return
 
+# ----------------- Квиз -----------------
 @dp.callback_query(lambda c: c.data == "start_quiz")
 async def cb_start_quiz(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -175,6 +184,7 @@ async def finalize_quiz(user_id: int):
     )
     await bot.send_message(NOTIFY_CHAT_ID, f"🟢 Пользователь {user_id} перешёл к менеджеру {SELLER_USERNAME}")
 
+# ----------------- Запуск бота -----------------
 async def main():
     print("🤖 Бот запущен и готов.")
     await dp.start_polling(bot)
