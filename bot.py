@@ -85,12 +85,23 @@ async def cmd_start(message: types.Message):
         await asyncio.sleep(10)
 
     # ----------------- Видео сразу после KPI -----------------
-    await message.answer(
-        "🎥 Отлично! Теперь пора применить знания на практике.\n"
-        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» и научись быстро привлекать лидов и контролировать бюджет.",
-        reply_markup=kb_get_video()
-    )
-    users_state[user_id]["step"] = "materials_sent"
+ @dp.callback_query(lambda c: c.data == "get_video")
+async def cb_get_video(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    ensure_user_state(user_id)
+
+    # send video link as button
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="▶️ Смотреть видео", url=VIDEO_URL)]
+    ])
+    await callback.message.answer("🎥 Видео-урок: запуск первой рекламной кампании", reply_markup=kb)
+
+    users_state[user_id]["step"] = "video_sent"
+    await bot.send_message(NOTIFY_CHAT_ID,
+                           f"🎬 {get_username_display(callback.from_user)} получил видео (ID: {user_id})")
+
+    # Provide next button (checklist) after video
+    await callback.message.answer("Готов перейти к чек-листу? Нажми кнопку ниже.", reply_markup=kb_get_checklist())
 
 # ----------------- Таймер и отложенное сообщение -----------------
 async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECONDS):
