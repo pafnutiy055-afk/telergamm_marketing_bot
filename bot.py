@@ -85,18 +85,16 @@ async def cmd_start(message: types.Message):
         await asyncio.sleep(10)
 
     # ----------------- Видео сразу после KPI -----------------
-if os.path.exists(KPI_FILE):
-    await message.answer_document(FSInputFile(KPI_FILE), caption="📊 Таблица KPI для анализа кампаний")
-    await asyncio.sleep(10)
+    await message.answer(
+        "🎥 Отлично! Теперь пора применить знания на практике.\n"
+        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» и научись быстро привлекать лидов и контролировать бюджет.",
+        reply_markup=kb_get_video()
+    )
+    users_state[user_id]["step"] = "video_sent"
 
-# Видео сразу после KPI
-await message.answer(
-    "🎥 Отлично! Теперь пора применить знания на практике.\n"
-    "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» и научись быстро привлекать лидов и контролировать бюджет.",
-    reply_markup=kb_get_video()
-)
-users_state[user_id]["step"] = "video_sent"
-
+    # ----------------- Запуск отложенного сообщения через 2 часа -----------------
+    if users_state[user_id]["timer_task"] is None:
+        users_state[user_id]["timer_task"] = asyncio.create_task(schedule_delayed_message(user_id))
 
 # ----------------- Таймер и отложенное сообщение -----------------
 async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECONDS):
@@ -117,7 +115,7 @@ async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECO
     except Exception:
         pass
 
-# ----------------- Команда "жопа" -----------------
+# ----------------- Ключевое слово "жопа" -----------------
 @dp.message()
 async def skip_timer_or_handle_text(message: types.Message):
     text = message.text.strip().lower()
@@ -148,7 +146,8 @@ async def cb_start_quiz(callback: CallbackQuery):
 
 async def send_quiz_question(user_id: int):
     st = users_state.get(user_id)
-    if not st: return
+    if not st:
+        return
     q_index = st["quiz"]["q_index"]
     if q_index >= len(QUIZ_QUESTIONS):
         await finalize_quiz(user_id)
@@ -163,9 +162,11 @@ async def send_quiz_question(user_id: int):
 async def cb_quiz_answer(callback: CallbackQuery):
     user_id = callback.from_user.id
     st = users_state.get(user_id)
-    if not st: return
+    if not st:
+        return
     parts = callback.data.split("_")
-    if len(parts) != 3: return
+    if len(parts) != 3:
+        return
     q_index, opt_index = int(parts[1]), int(parts[2])
     quiz = st["quiz"]
     while len(quiz["answers"]) <= q_index:
@@ -177,7 +178,8 @@ async def cb_quiz_answer(callback: CallbackQuery):
 
 async def finalize_quiz(user_id: int):
     st = users_state.get(user_id)
-    if not st: return
+    if not st:
+        return
     st["quiz_done"] = True
     trigger_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{SELLER_USERNAME.lstrip('@')}")]
