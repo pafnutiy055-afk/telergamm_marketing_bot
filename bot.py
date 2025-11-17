@@ -24,11 +24,17 @@ dp = Dispatcher(storage=MemoryStorage())
 users_state: Dict[int, Dict[str, Any]] = {}
 
 # ----------------- Клавиатуры -----------------
-def kb_get_video(): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton("🎥 Получить видео", callback_data="get_video")]])
-def kb_get_checklist(): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton("📑 Получить чек-лист", callback_data="get_checklist")]])
-def kb_get_kpi(): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton("📊 Получить таблицу KPI", callback_data="get_kpi")]])
-def kb_start_quiz(): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton("🧠 Начать квиз", callback_data="start_quiz")]])
+def kb_get_video():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton("▶️ Смотреть урок и запустить рекламу", url=VIDEO_URL)]
+    ])
 
+def kb_start_quiz():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton("🧠 Начать квиз", callback_data="start_quiz")]
+    ])
+
+# Вопросы для квиза
 QUIZ_QUESTIONS: List[Dict[str, Any]] = [
     {"text": "1) Какая у тебя ниша?", "opts": ["Услуги", "Товары", "Онлайн-школа", "Другое"]},
     {"text": "2) Какую цель ставишь для кампании?", "opts": ["Лиды", "Продажи", "Трафик", "Повышение узнаваемости"]},
@@ -52,43 +58,34 @@ async def cmd_start(message: types.Message):
 
     greeting = (
         "Привет! 👋\nЭто Артем и команда Foton Plus.\n\n"
-        "Мы рады приветствовать тебя в нашем образовательном пространстве по маркетингу! 🎯\n"
-        "🎁 Первый подарок: мини-гайд, чек-лист, таблица KPI и видео.\n"
-        "⚡️ Совет: изучай материалы и применяй — так результат будет быстрее."
+        "Добро пожаловать в образовательное пространство по маркетингу! 🎯\n"
+        "🎁 Мы подготовили для тебя полезный набор материалов, чтобы сразу применить их на практике.\n"
+        "⚡️ Совет: изучай шаг за шагом и начинай запускать кампании уже сегодня."
     )
     await message.answer(greeting)
 
-    # notify only start
+    # уведомление только о старте
     await bot.send_message(NOTIFY_CHAT_ID, f"✅ {get_username_display(message.from_user)} запустил бота (ID: {user_id})")
 
-    # выдаем материалы по очереди с задержкой
+    # выдаём материалы по очереди с задержкой 10 секунд
     if os.path.exists(MANUAL_FILE):
-        await message.answer_document(FSInputFile(MANUAL_FILE), caption="📘 Мини-мануал")
+        await message.answer_document(FSInputFile(MANUAL_FILE), caption="📘 Мини-мануал — стартовый материал")
         await asyncio.sleep(10)
     if os.path.exists(CHECKLIST_FILE):
-        await message.answer_document(FSInputFile(CHECKLIST_FILE), caption="📑 Чек-лист")
+        await message.answer_document(FSInputFile(CHECKLIST_FILE), caption="📑 Чек-лист: проверка рекламной кампании")
         await asyncio.sleep(10)
     if os.path.exists(KPI_FILE):
-        await message.answer_document(FSInputFile(KPI_FILE), caption="📊 Таблица KPI")
+        await message.answer_document(FSInputFile(KPI_FILE), caption="📊 Таблица KPI для анализа кампаний")
         await asyncio.sleep(10)
-    await message.answer("Далее — видео. Нажми кнопку для получения.", reply_markup=kb_get_video())
 
+    # отправка видео с кнопкой
+    await message.answer(
+        "🎥 Отлично! Теперь пора применить знания на практике.\n"
+        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» "
+        "и научись быстро привлекать лидов и контролировать бюджет.",
+        reply_markup=kb_get_video()
+    )
     users_state[user_id]["step"] = "materials_sent"
-
-# ----------------- Видео -----------------
-@dp.callback_query(lambda c: c.data == "get_video")
-async def cb_get_video(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    ensure_user_state(user_id)
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton("▶️ Смотреть видео", url=VIDEO_URL)]])
-    await callback.message.answer("🎥 Видео-урок: запуск первой рекламной кампании", reply_markup=kb)
-    users_state[user_id]["step"] = "video_sent"
-
-    # Schedule delayed message for quiz
-    task = users_state[user_id].get("timer_task")
-    if task is None or task.done():
-        t = asyncio.create_task(schedule_delayed_message(user_id))
-        users_state[user_id]["timer_task"] = t
 
 # ----------------- Отложенное сообщение -----------------
 async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECONDS):
@@ -109,7 +106,7 @@ async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECO
     except Exception:
         pass
 
-# ----------------- Команда "жопа" пропускает таймер -----------------
+# ----------------- Команда "жопа" -----------------
 @dp.message()
 async def skip_timer_or_handle_text(message: types.Message):
     text = message.text.strip().lower()
@@ -146,7 +143,9 @@ async def send_quiz_question(user_id: int):
         await finalize_quiz(user_id)
         return
     q = QUIZ_QUESTIONS[q_index]
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(opt, callback_data=f"quiz_{q_index}_{i}")] for i,opt in enumerate(q["opts"])])
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(opt, callback_data=f"quiz_{q_index}_{i}")] for i, opt in enumerate(q["opts"])]
+    )
     await bot.send_message(user_id, q["text"], reply_markup=kb)
 
 @dp.callback_query(lambda c: c.data.startswith("quiz_"))
@@ -170,15 +169,18 @@ async def cb_quiz_answer(callback: CallbackQuery):
 async def finalize_quiz(user_id: int):
     st = users_state.get(user_id)
     if not st: return
-    answers = st["quiz"].get("answers", [])
     st["quiz_done"] = True
 
     # Trigger message → переход к менеджеру
-    trigger_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{SELLER_USERNAME.lstrip('@')}")]])
-    await bot.send_message(user_id,
-                           "🔔 У тебя нет системной схемы запуска рекламы → вот что тебе нужно…\n\n"
-                           "Свяжись с менеджером для разбора кампании.",
-                           reply_markup=trigger_kb)
+    trigger_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{SELLER_USERNAME.lstrip('@')}")]
+    ])
+    await bot.send_message(
+        user_id,
+        "🔔 У тебя нет системной схемы запуска рекламы → вот что тебе нужно…\n\n"
+        "Свяжись с менеджером для разбора кампании и подготовки эффективного плана.",
+        reply_markup=trigger_kb
+    )
 
     # уведомление только о переходе к менеджеру
     await bot.send_message(NOTIFY_CHAT_ID, f"🟢 Пользователь {user_id} перешёл к менеджеру {SELLER_USERNAME}")
@@ -190,4 +192,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
