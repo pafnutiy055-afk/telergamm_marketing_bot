@@ -71,18 +71,35 @@ async def cmd_start(message: types.Message):
     await message.answer(greeting)
     await bot.send_message(NOTIFY_CHAT_ID, f"✅ {get_username_display(message.from_user)} запустил бота (ID: {user_id})")
 
-    # ----------------- Отправка материалов с задержкой -----------------
+    # ----------------- Отправка материалов без задержек -----------------
+    # 1) Мини-мануал
     if os.path.exists(MANUAL_FILE):
-        await message.answer_document(FSInputFile(MANUAL_FILE), caption="📘 Мини-мануал — стартовый материал")
-        await asyncio.sleep(10)
+        await message.answer_document(
+            FSInputFile(MANUAL_FILE),
+            caption="📘 Мини-мануал — стартовый материал"
+        )
 
-    if os.path.exists(CHECKLIST_FILE):
-        await message.answer_document(FSInputFile(CHECKLIST_FILE), caption="📑 Чек-лист: проверка рекламной кампании")
-        await asyncio.sleep(10)
-
+    # 2) Таблица KPI
     if os.path.exists(KPI_FILE):
-        await message.answer_document(FSInputFile(KPI_FILE), caption="📊 Таблица KPI для анализа кампаний")
-        await asyncio.sleep(10)
+        await message.answer_document(
+            FSInputFile(KPI_FILE),
+            caption="📊 Таблица KPI для анализа кампаний"
+        )
+
+    # 3) Видео
+    await message.answer(
+        "🎥 Отлично! Теперь пора применить знания на практике.\n"
+        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ»:",
+        reply_markup=kb_get_video()
+    )
+    users_state[user_id]["step"] = "video_sent"
+
+    # 4) Чек-лист
+    if os.path.exists(CHECKLIST_FILE):
+        await message.answer_document(
+            FSInputFile(CHECKLIST_FILE),
+            caption="📑 Чек-лист: проверка рекламной кампании"
+        )
 
     # ----------------- Видео сразу после KPI -----------------
     await message.answer(
