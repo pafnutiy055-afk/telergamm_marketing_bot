@@ -9,10 +9,13 @@ from aiogram.fsm.storage.memory import MemoryStorage
 # ----------------- Настройки -----------------
 BOT_TOKEN = "8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0"
 NOTIFY_CHAT_ID = -1003322951241
+
 VIDEO_URL = "https://youtu.be/P-3NZnicpbk"
+
 MANUAL_FILE = "marketing_manual.pdf"
 CHECKLIST_FILE = "check_list.pdf"
 KPI_FILE = "metrika.pdf"
+
 SELLER_USERNAME = "@E_L_0_A_X"
 DELAY_SECONDS = 2 * 60 * 60  # 2 часа
 
@@ -24,9 +27,14 @@ dp = Dispatcher(storage=MemoryStorage())
 users_state: Dict[int, Dict[str, Any]] = {}
 
 # ----------------- Клавиатуры -----------------
+def kb_get_video_button():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton("▶️ Получить видеоурок", callback_data="get_video")]
+    ])
+
 def kb_get_video():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("▶️ Смотреть урок и запустить рекламу", url=VIDEO_URL)]
+        [InlineKeyboardButton("▶️ Смотреть урок", url=VIDEO_URL)]
     ])
 
 def kb_start_quiz():
@@ -39,7 +47,7 @@ QUIZ_QUESTIONS: List[Dict[str, Any]] = [
     {"text": "1) Какая у тебя ниша?", "opts": ["Услуги", "Товары", "Онлайн-школа", "Другое"]},
     {"text": "2) Какую цель ставишь для кампании?", "opts": ["Лиды", "Продажи", "Трафик", "Повышение узнаваемости"]},
     {"text": "3) Опыт в рекламе?", "opts": ["Запускаю впервые", "Настраивал пару раз", "Уверенно работаю", "Я профи"]},
-    {"text": "4) Где планируешь запускаться?", "opts": ["Яндекс Директ", "VK / MyTarget", "Meta (Facebook/Instagram)", "Пока не знаю"]}
+    {"text": "4) Где планируешь запускаться?", "opts": ["Яндекс Директ", "VK / MyTarget", "Meta (FB/Instagram)", "Пока не знаю"]},
 ]
 
 # ----------------- Утилиты -----------------
@@ -69,51 +77,37 @@ async def cmd_start(message: types.Message):
         "⚡️ Совет: изучай пошагово и запускай кампании уже сегодня!"
     )
     await message.answer(greeting)
-    await bot.send_message(NOTIFY_CHAT_ID, f"✅ {get_username_display(message.from_user)} запустил бота (ID: {user_id})")
 
-    # ----------------- Отправка материалов без задержек -----------------
-    # 1) Мини-мануал
+    await bot.send_message(
+        NOTIFY_CHAT_ID,
+        f"✅ {get_username_display(message.from_user)} запустил бота (ID: {user_id})"
+    )
+
+    # ----------- Отправка материалов без задержек -----------
     if os.path.exists(MANUAL_FILE):
-        await message.answer_document(
-            FSInputFile(MANUAL_FILE),
-            caption="📘 Мини-мануал — стартовый материал"
-        )
+        await message.answer_document(FSInputFile(MANUAL_FILE), caption="📘 Мини-мануал — стартовый материал")
 
-    # 2) Таблица KPI
     if os.path.exists(KPI_FILE):
-        await message.answer_document(
-            FSInputFile(KPI_FILE),
-            caption="📊 Таблица KPI для анализа кампаний"
-        )
+        await message.answer_document(FSInputFile(KPI_FILE), caption="📊 Таблица KPI для анализа кампаний")
 
-    # 3) Видео
-    await message.answer(
-        "🎥 Отлично! Теперь пора применить знания на практике.\n"
-        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ»:",
-        reply_markup=kb_get_video()
-    )
-    users_state[user_id]["step"] = "video_sent"
-
-    # 4) Чек-лист
     if os.path.exists(CHECKLIST_FILE):
-        await message.answer_document(
-            FSInputFile(CHECKLIST_FILE),
-            caption="📑 Чек-лист: проверка рекламной кампании"
-        )
+        await message.answer_document(FSInputFile(CHECKLIST_FILE), caption="📑 Чек-лист: проверка рекламной кампании")
 
-    # ----------------- Видео сразу после KPI -----------------
+    # ----------- Кнопка получения видео -----------
     await message.answer(
         "🎥 Отлично! Теперь пора применить знания на практике.\n"
-        "Смотри видеоурок «Запуск первой рекламной кампании в Яндекс Директ» и научись быстро привлекать лидов и контролировать бюджет.",
-        reply_markup=kb_get_video()
+        "Нажми кнопку ниже, чтобы получить видеоурок:",
+        reply_markup=kb_get_video_button()
     )
-    users_state[user_id]["step"] = "video_sent"
 
-    # ----------------- Запуск отложенного сообщения через 2 часа -----------------
+    users_state[user_id]["step"] = "video_button"
+
+    # ----------- Запуск таймера 2 часа -----------
     if users_state[user_id]["timer_task"] is None:
         users_state[user_id]["timer_task"] = asyncio.create_task(schedule_delayed_message(user_id))
 
-# ----------------- Таймер и отложенное сообщение -----------------
+
+# ----------------- Таймер -----------------
 async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECONDS):
     try:
         await asyncio.sleep(delay_seconds)
@@ -125,14 +119,16 @@ async def schedule_delayed_message(user_id: int, delay_seconds: int = DELAY_SECO
         return
 
     try:
-        await bot.send_message(user_id,
-                               "⏰ Ты уже посмотрел видео и материалы? Хочешь разбор твоей рекламной кампании?",
-                               reply_markup=kb_start_quiz())
+        await bot.send_message(
+            user_id,
+            "⏰ Ты уже посмотрел видео и материалы? Хочешь разбор твоей рекламной кампании?",
+            reply_markup=kb_start_quiz()
+        )
         st["delayed_sent"] = True
-    except Exception:
+    except:
         pass
 
-# ----------------- Ключевое слово "жопа" -----------------
+# ----------------- Ключевое слово “жопа” -----------------
 @dp.message()
 async def skip_timer_or_handle_text(message: types.Message):
     text = message.text.strip().lower()
@@ -143,37 +139,65 @@ async def skip_timer_or_handle_text(message: types.Message):
         task = users_state[user_id].get("timer_task")
         if task and not task.done():
             task.cancel()
-        try:
-            await bot.send_message(user_id,
-                                   "⏰ Таймер пропущен! Хочешь разбор твоей рекламной кампании?",
-                                   reply_markup=kb_start_quiz())
-            users_state[user_id]["delayed_sent"] = True
-        except Exception:
-            pass
+
+        await bot.send_message(
+            user_id,
+            "🔥 Таймер пропущен! Готов пройти быстрый квиз?",
+            reply_markup=kb_start_quiz()
+        )
+        users_state[user_id]["delayed_sent"] = True
         return
+
+
+# ----------------- Получение видео -----------------
+@dp.callback_query(lambda c: c.data == "get_video")
+async def cb_get_video(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    ensure_user_state(user_id)
+
+    await callback.message.answer(
+        "🎥 Видео-урок: «Запуск первой рекламной кампании в Яндекс Директ»",
+        reply_markup=kb_get_video()
+    )
+
+    users_state[user_id]["step"] = "video_sent"
+    await callback.answer()
+
 
 # ----------------- Квиз -----------------
 @dp.callback_query(lambda c: c.data == "start_quiz")
 async def cb_start_quiz(callback: CallbackQuery):
     user_id = callback.from_user.id
     ensure_user_state(user_id)
+
     users_state[user_id]["quiz"] = {"q_index": 0, "answers": []}
+
     await send_quiz_question(user_id)
     await callback.answer()
+
 
 async def send_quiz_question(user_id: int):
     st = users_state.get(user_id)
     if not st:
         return
+
     q_index = st["quiz"]["q_index"]
+
     if q_index >= len(QUIZ_QUESTIONS):
         await finalize_quiz(user_id)
         return
+
     q = QUIZ_QUESTIONS[q_index]
+
     kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(opt, callback_data=f"quiz_{q_index}_{i}")] for i, opt in enumerate(q["opts"])]
+        inline_keyboard=[
+            [InlineKeyboardButton(opt, callback_data=f"quiz_{q_index}_{i}")]
+            for i, opt in enumerate(q["opts"])
+        ]
     )
+
     await bot.send_message(user_id, q["text"], reply_markup=kb)
+
 
 @dp.callback_query(lambda c: c.data.startswith("quiz_"))
 async def cb_quiz_answer(callback: CallbackQuery):
@@ -181,33 +205,45 @@ async def cb_quiz_answer(callback: CallbackQuery):
     st = users_state.get(user_id)
     if not st:
         return
+
     parts = callback.data.split("_")
     if len(parts) != 3:
         return
-    q_index, opt_index = int(parts[1]), int(parts[2])
+
+    q_index = int(parts[1])
+    opt_index = int(parts[2])
+
     quiz = st["quiz"]
     while len(quiz["answers"]) <= q_index:
         quiz["answers"].append(None)
+
     quiz["answers"][q_index] = QUIZ_QUESTIONS[q_index]["opts"][opt_index]
     quiz["q_index"] = q_index + 1
+
     await callback.answer("Ответ записан.")
     await send_quiz_question(user_id)
+
 
 async def finalize_quiz(user_id: int):
     st = users_state.get(user_id)
     if not st:
         return
+
     st["quiz_done"] = True
+
     trigger_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{SELLER_USERNAME.lstrip('@')}")]
     ])
+
     await bot.send_message(
         user_id,
         "🔔 У тебя нет системной схемы запуска рекламы → вот что тебе нужно…\n\n"
         "Свяжись с менеджером для разбора кампании и подготовки эффективного плана.",
         reply_markup=trigger_kb
     )
+
     await bot.send_message(NOTIFY_CHAT_ID, f"🟢 Пользователь {user_id} перешёл к менеджеру {SELLER_USERNAME}")
+
 
 # ----------------- Запуск бота -----------------
 async def main():
