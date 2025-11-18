@@ -12,15 +12,10 @@ dp = Dispatcher()
 NOTIFY_CHAT_ID = -1003322951241
 
 welcome_text = (
-    "Привет! 👋
-"
-    "Это Артем и команда Foton Plus.
-
-"
-    "Готов начать обучение по маркетингу? 🎯
-"
-    "Последовательно выдаю материалы.
-"
+    "Привет! 👋\n"
+    "Это Артем и команда Foton Plus.\n\n"
+    "Готов начать обучение по маркетингу? 🎯\n"
+    "Последовательно выдаю материалы.\n"
 )
 
 user_state = {}
@@ -60,7 +55,7 @@ async def send_kpi(callback: types.CallbackQuery):
     if os.path.exists(path):
         await callback.message.answer_document(FSInputFile(path), caption="📊 Таблица KPI")
     else:
-        await callback.message.answer("❌ Файл kpi.pdf не найден.")
+        await callback.message.answer("❌ Файл metrika.pdf не найден.")
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📑 Получить чек-лист", callback_data="get_checklist")]
@@ -89,19 +84,18 @@ async def send_video(callback: types.CallbackQuery):
     VIDEO_URL = "https://youtu.be/P-3NZnicpbk"
 
     await callback.message.answer(
-        "🎥 Видео урок готов!
-Смотри внимательно — через 2 часа я пришлю важное сообщение."
+        "🎥 Видео урок готов!\nСмотри внимательно. Удачи в запуске первой рекламной кампании!"
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎥 Смотреть урок", url=VIDEO_URL)]
     ])
-
     await callback.message.answer("Нажми, чтобы открыть видео 👇", reply_markup=kb)
 
     username = f"@{callback.from_user.username}" if callback.from_user.username else callback.from_user.full_name
     await bot.send_message(NOTIFY_CHAT_ID, f"🎬 Пользователь открыл видео: {username} (ID: {callback.from_user.id})")
 
+    # Через 2 часа кнопка запуска квиза
     user_state[callback.from_user.id]["quiz_ready_at"] = datetime.now() + timedelta(hours=2)
 
 @dp.callback_query(F.data == "start_quiz")
@@ -113,27 +107,21 @@ async def quiz_start(callback: types.CallbackQuery):
 async def quiz_flow(message: types.Message):
     uid = message.from_user.id
 
-    # авто-появление кнопки через 2 часа
+    # Кнопка появления квиза через 2 часа после видео
     if uid in user_state and "quiz_ready_at" in user_state[uid]:
         if datetime.now() >= user_state[uid]["quiz_ready_at"]:
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🧠 Пройти квиз", callback_data="start_quiz")]
             ])
             await message.answer(
-                "Уже отсмотрел материалы?🔥
-"
-                "Давай я помогу запустить тебе самую эффективную рекламу.
-"
+                "Уже отсмотрел материалы? 🔥\n"
+                "Давай я помогу запустить тебе самую эффективную рекламу.\n"
                 "Жми сюда 👇",
                 reply_markup=kb
             )
             del user_state[uid]["quiz_ready_at"]
 
-    # ниже — сам квиз
-    if uid not in user_state or "quiz_step" not in user_state[uid]:
-        return
-async def quiz_flow(message: types.Message):
-    uid = message.from_user.id
+    # Ниже — логика прохождения квиза
     if uid not in user_state or "quiz_step" not in user_state[uid]:
         return
 
@@ -154,18 +142,16 @@ async def quiz_flow(message: types.Message):
     elif step == 4:
         user_state[uid]["platform"] = message.text
 
-        
         username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
         await bot.send_message(NOTIFY_CHAT_ID, f"📨 Завершил квиз, идёт к менеджеру: {username} (ID: {message.from_user.id})")
 
         kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📩 Получить разбор", url="https://t.me/bery_lydu")], url="https://t.me/bery_lydu")]
+            [InlineKeyboardButton(text="📩 Получить разбор", url="https://t.me/bery_lydu")]
         ])
 
         await message.answer(
-            "🔥 Отлично! На основе твоих ответов мы можем подготовить персональный разбор твоей рекламной стратегии."
-            "
-Нажми на кнопку ниже и напиши менеджеру, чтобы получить бесплатный разбор 👇",
+            "🔥 Отлично! На основе твоих ответов мы можем подготовить персональный разбор твоей рекламной стратегии.\n"
+            "Нажми на кнопку ниже и напиши менеджеру, чтобы получить бесплатный разбор 👇",
             reply_markup=kb
         )
 
@@ -176,4 +162,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
