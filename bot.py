@@ -1,10 +1,13 @@
 import os
 import asyncio
+import logging
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
-from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.enums import ChatAction # <-- Новый импорт для имитации печати
-import logging # <-- Добавляем логирование для отладки
+from aiogram.filters import Command, StateFilter
+from aiogram.types import (
+    FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardMarkup, KeyboardButton, BotCommand
+)
+from aiogram.enums import ChatAction
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
@@ -12,19 +15,44 @@ logging.basicConfig(level=logging.INFO)
 # ВАЖНО: Смените токен в BotFather, так как старый был скомпрометирован
 BOT_TOKEN = "8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0" 
 
+# Константы
+NOTIFY_CHAT_ID = -1003322951241
+MANAGER_CONTACT_LINK = "https://t.me/bery_lydu"
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-
-NOTIFY_CHAT_ID = -1003322951241
 
 # Хранилище состояний
 user_state = {}
 
-# --- Тексты для высокой конверсии ---
+# --- Клавиатуры ---
+
+# 1. Reply-клавиатура (постоянное меню)
+MAIN_MENU_KEYBOARD = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="🔄 Начать сначала"),
+            KeyboardButton(text="❓ Помощь/Поддержка")
+        ]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=False
+)
+
+# 2. Список команд для регистрации в Telegram
+BOT_COMMANDS = [
+    BotCommand(command="/start", description="🏠 Главное меню и начало воронки"),
+    BotCommand(command="/menu", description="▶️ Вызвать главное меню"),
+    BotCommand(command="/help", description="❓ Связь с поддержкой")
+]
+
+# --- Тексты для высокой конверсии и Social Proof ---
+
 TEXT_WELCOME = (
     "👋 **Привет! Это Артём и команда Foton Plus.**\n\n"
     "Мы не льем воду, мы даем инструменты, которые приносят деньги. 💸\n"
-    "Я подготовил для тебя пошаговую систему по маркетингу.\n\n"
+    "Я подготовил для тебя пошаговую систему по маркетингу.\n"
+    "🛡️ **Наши гайды помогли 150+ предпринимателям сэкономить бюджет.**\n\n" # <-- Social Proof
     "Готов забрать первый инструмент и усилить свой бизнес? 👇"
 )
 
@@ -43,7 +71,8 @@ TEXT_KPI_SENT = (
 TEXT_CHECKLIST_SENT = (
     "📑 **Чек-лист «Проверка кампании»**\n\n"
     "Теперь ты защищен от глупых ошибок. \n"
-    "🔥 А сейчас — самое главное. **Секретный видеоурок**, где я разбираю реальные стратегии."
+    "🔥 А сейчас — самое главное. **Секретный видеоурок**, где я разбираю реальные стратегии.\n"
+    "🔥 **Видео, которое уже посмотрели 3000+ маркетологов.**" # <-- Social Proof
 )
 
 TEXT_VIDEO_SENT = (
@@ -59,31 +88,58 @@ TEXT_QUIZ_OFFER = (
     "Ответь на 4 простых вопроса, и мы составим план действий конкретно для тебя. 👇"
 )
 
-# --- Хендлеры ---
+# --- Хендлеры главного меню и команд ---
 
-@dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    # Имитация печати
+async def send_welcome_and_menu(message: types.Message):
+    """Отправляет приветствие и Reply-клавиатуру."""
     await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
     await asyncio.sleep(0.5) 
     
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📘 Скачать мануал", callback_data="get_manual")]
     ])
-    await message.answer(TEXT_WELCOME, reply_markup=kb, parse_mode="Markdown")
+    
+    # Отправляем сообщение с Reply-клавиатурой
+    await message.answer(
+        TEXT_WELCOME, 
+        reply_markup=MAIN_MENU_KEYBOARD, # <-- Добавляем постоянное меню
+        parse_mode="Markdown"
+    )
 
-    try:
-        username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
-        await bot.send_message(NOTIFY_CHAT_ID, f"🔥 Новый лид: {username} (ID: {message.from_user.id})")
-    except Exception as e:
-        logging.error(f"Ошибка отправки уведомления о старте: {e}")
+    username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
+    await bot.send_message(NOTIFY_CHAT_ID, f"🔥 Новый лид: {username} (ID: {message.from_user.id})")
+
+@dp.message(Command("start", "menu") | F.text.lower() == "🔄 начать сначала")
+async def handle_start_or_menu(message: types.Message):
+    # Сбрасываем текущее состояние квиза при повторном старте
+    if message.from_user.id in user_state:
+        del user_state[message.from_user.id]
+        
+    await send_welcome_and_menu(message)
+
+@dp.message(Command("help") | F.text.lower() == "❓ помощь/поддержка")
+async def handle_help(message: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📩 Написать менеджеру", url=MANAGER_CONTACT_LINK)]
+    ])
+    
+    await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
+    await asyncio.sleep(0.5)
+
+    await message.answer(
+        "🤝 **Связаться с нами просто!**\n\n"
+        "Если у вас возникли вопросы по материалам, или вы хотите получить консультацию по запуску, напишите нашему менеджеру.",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
+
+# --- Основные хендлеры воронки (с имитацией печати) ---
 
 @dp.callback_query(F.data == "get_manual")
 async def send_manual(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
     
-    # Имитация печати перед документом
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(0.5)
 
@@ -93,7 +149,6 @@ async def send_manual(callback: types.CallbackQuery):
     else:
         await callback.message.answer("⚠️ Файл marketing_manual.pdf временно недоступен, но мы работаем над этим.")
 
-    # Имитация печати перед вторым сообщением
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(0.7)
 
@@ -107,7 +162,6 @@ async def send_kpi(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
 
-    # Имитация печати перед документом
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(0.5)
 
@@ -117,7 +171,6 @@ async def send_kpi(callback: types.CallbackQuery):
     else:
         await callback.message.answer("⚠️ Файл metrika.pdf не найден.")
     
-    # Имитация печати перед вторым сообщением
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(0.7)
 
@@ -131,7 +184,6 @@ async def send_checklist(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
 
-    # Имитация печати перед документом
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(0.5)
     
@@ -141,7 +193,6 @@ async def send_checklist(callback: types.CallbackQuery):
     else:
         await callback.message.answer("⚠️ Файл check_list.pdf не найден.")
 
-    # Имитация печати перед вторым сообщением
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(0.8)
 
@@ -156,7 +207,6 @@ async def send_video(callback: types.CallbackQuery):
     chat_id = callback.message.chat.id
     VIDEO_URL = "https://youtu.be/P-3NZnicpbk"
     
-    # Имитация печати
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(1.0) 
 
@@ -172,9 +222,8 @@ async def send_video(callback: types.CallbackQuery):
     asyncio.create_task(delayed_quiz_offer(callback.message.chat.id))
 
 async def delayed_quiz_offer(chat_id: int):
-    """Функция ожидания и отправки приглашения на квиз (без имитации печати)"""
-    # Этот таймер остается без имитации печати, чтобы не занимать ресурсы
-    await asyncio.sleep(2 * 60 * 60) # Ждем 2 часа (7200 секунд)
+    """Функция ожидания и отправки приглашения на квиз"""
+    await asyncio.sleep(2 * 60 * 60) 
     
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🧠 ПРОЙТИ РАЗБОР", callback_data="start_quiz")]
@@ -185,14 +234,13 @@ async def delayed_quiz_offer(chat_id: int):
     except Exception as e:
         logging.error(f"Не удалось отправить отложенное сообщение пользователю {chat_id}: {e}")
 
-# --- Логика Квиза ---
+# --- Логика Квиза (с персонализацией) ---
 
 @dp.callback_query(F.data == "start_quiz")
 async def quiz_start(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
     
-    # Имитация печати
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(0.5)
 
@@ -202,17 +250,26 @@ async def quiz_start(callback: types.CallbackQuery):
     username = f"@{callback.from_user.username}" if callback.from_user.username else callback.from_user.full_name
     await bot.send_message(NOTIFY_CHAT_ID, f"🧠 Лид начал квиз: {username}")
 
+@dp.message(F.text, StateFilter(None) | F.text.in_(("🔄 Начать сначала", "❓ Помощь/Поддержка")), ~F.text.startswith('/'))
+async def ignore_menu_in_quiz(message: types.Message):
+    """Игнорируем нажатия на Reply-клавиатуру во время активного квиза"""
+    uid = message.from_user.id
+    if uid in user_state and "quiz_step" in user_state[uid]:
+        await message.answer("👆 Пожалуйста, сначала ответьте на текущий вопрос, чтобы продолжить.")
+        return
+    # Если не в квизе, то другие хендлеры (start, help) обработают нажатие.
+
 @dp.message(F.text)
 async def quiz_flow(message: types.Message):
     uid = message.from_user.id
     chat_id = message.chat.id
 
     if uid not in user_state or "quiz_step" not in user_state[uid]:
+        # Если пользователь пишет, когда нет активного квиза
         return
 
     step = user_state[uid]["quiz_step"]
 
-    # Имитация печати перед каждым ответом бота
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await asyncio.sleep(0.7) 
 
@@ -234,44 +291,57 @@ async def quiz_flow(message: types.Message):
     elif step == 4:
         user_state[uid]["platform"] = message.text
 
+        # --- Персонализированный финальный ответ ---
+        niche = user_state[uid].get('niche', 'вашей нише')
+        goal = user_state[uid].get('goal', 'достижении цели')
+
+        final_message_personalized = (
+            f"🔥 **Отлично! Результаты квиза обработаны!**\n\n"
+            f"Мы видим, что вы работаете в нише **{niche}** и ваша главная цель — **{goal}**.\n\n"
+            f"На основе этой информации мы уже определили **3 точки роста** для вашего запуска, которые дадут максимальный ROI (окупаемость инвестиций).\n\n"
+            f"Нажимайте на кнопку ниже, чтобы забрать готовый разбор 👇"
+        )
+        
         # Сбор ответов для менеджера
         answers = (
-            f"Ниша: {user_state[uid].get('niche')}\n"
-            f"Цель: {user_state[uid].get('goal')}\n"
+            f"Ниша: {niche}\n"
+            f"Цель: {goal}\n"
             f"Опыт: {user_state[uid].get('experience')}\n"
             f"Площадка: {user_state[uid].get('platform')}"
         )
 
         username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
         
-        # Отправка заявки менеджеру
         await bot.send_message(
             NOTIFY_CHAT_ID, 
             f"✅ **КВИЗ ЗАВЕРШЕН!**\n👤: {username} (ID: {uid})\n\n📄 **Ответы:**\n{answers}"
         )
 
-        # Имитация печати перед финальным сообщением
         await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
         await asyncio.sleep(1.0) 
 
         kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📩 ЗАБРАТЬ РАЗБОР", url="https://t.me/bery_lydu")]
+            [InlineKeyboardButton(text="📩 ЗАБРАТЬ РАЗБОР", url=MANAGER_CONTACT_LINK)]
         ])
 
         await message.answer(
-            "🔥 **Спасибо! Я проанализировал твои ответы.**\n\n"
-            "Мы подготовили стратегию специально под твою нишу.\n"
-            "Нажми кнопку ниже, напиши менеджеру **«РАЗБОР»**, и мы бесплатно обсудим твой запуск! 👇",
+            final_message_personalized,
             reply_markup=kb,
             parse_mode="Markdown"
         )
 
-        # Очистка состояния
         if uid in user_state:
             del user_state[uid]
 
+async def register_commands(bot: Bot):
+    """Регистрирует команды бота в Telegram."""
+    await bot.set_my_commands(BOT_COMMANDS)
+    logging.info("Команды бота успешно зарегистрированы.")
+
 async def main():
     logging.info("Бот запущен...")
+    # Регистрируем команды при старте
+    await register_commands(bot) 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
