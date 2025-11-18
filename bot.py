@@ -3,51 +3,81 @@ import asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
-from datetime import datetime, timedelta
 
-BOT_TOKEN = "8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0"
+# ВАЖНО: Смените токен в BotFather, так как старый был скомпрометирован
+BOT_TOKEN = "8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0" 
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 NOTIFY_CHAT_ID = -1003322951241
 
-welcome_text = (
-    "Привет! 👋\n"
-    "Это Артем и команда Foton Plus.\n\n"
-    "Готов начать обучение по маркетингу? 🎯\n"
-    "Последовательно выдаю материалы.\n"
+# Хранилище состояний (в идеале использовать FSMContext или базу данных)
+user_state = {}
+
+# --- Тексты для высокой конверсии ---
+TEXT_WELCOME = (
+    "👋 **Привет! Это Артём и команда Foton Plus.**\n\n"
+    "Мы не льем воду, мы даем инструменты, которые приносят деньги. 💸\n"
+    "Я подготовил для тебя пошаговую систему по маркетингу.\n\n"
+    "Готов забрать первый инструмент и усилить свой бизнес? 👇"
 )
 
-user_state = {}
+TEXT_MANUAL_SENT = (
+    "📘 **Твой Мануал по маркетингу**\n\n"
+    "Изучи его, чтобы понимать базу. Но теория без цифр — ничто.\n"
+    "Готов взять под контроль показатели своего бизнеса?"
+)
+
+TEXT_KPI_SENT = (
+    "📊 **Таблица KPI (Метрика)**\n\n"
+    "Теперь ты видишь цифры. Но уверен ли ты, что твоя реклама настроена без ошибок?\n"
+    "Держи чек-лист, который спас тысячи бюджетов от слива. 👇"
+)
+
+TEXT_CHECKLIST_SENT = (
+    "📑 **Чек-лист «Проверка кампании»**\n\n"
+    "Теперь ты защищен от глупых ошибок. \n"
+    "🔥 А сейчас — самое главное. **Секретный видеоурок**, где я разбираю реальные стратегии."
+)
+
+TEXT_VIDEO_SENT = (
+    "🎥 **ДОСТУП ОТКРЫТ!**\n\n"
+    "В этом видео — концентрат опыта. Смотри внимательно, инсайты гарантированы.\n\n"
+    "⏳ *Через 2 часа я вернусь с важным предложением.*"
+)
+
+TEXT_QUIZ_OFFER = (
+    "🚀 **Прошло 2 часа! Как впечатления?**\n\n"
+    "Материалы — это круто, но результат дает только **индивидуальная стратегия**.\n\n"
+    "Давай я помогу адаптировать эти знания под ТВОЙ бизнес. \n"
+    "Ответь на 4 простых вопроса, и мы составим план действий конкретно для тебя. 👇"
+)
+
+# --- Хендлеры ---
 
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
-    await message.answer(welcome_text)
-
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📘 Получить мануал", callback_data="get_manual")]
+        [InlineKeyboardButton(text="📘 Скачать мануал", callback_data="get_manual")]
     ])
-    await message.answer("Твой первый материал 👇", reply_markup=kb)
+    await message.answer(TEXT_WELCOME, reply_markup=kb, parse_mode="Markdown")
 
     username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
-    await bot.send_message(NOTIFY_CHAT_ID, f"🔥 Новый старт: {username} (ID: {message.from_user.id})")
-
-    user_state[message.from_user.id] = {"last_material": datetime.now()}
+    await bot.send_message(NOTIFY_CHAT_ID, f"🔥 Новый лид: {username} (ID: {message.from_user.id})")
 
 @dp.callback_query(F.data == "get_manual")
 async def send_manual(callback: types.CallbackQuery):
     path = "marketing_manual.pdf"
     if os.path.exists(path):
-        await callback.message.answer_document(FSInputFile(path), caption="📘 Мини-гайд по маркетингу")
+        await callback.message.answer_document(FSInputFile(path), caption="📘 Твой мануал")
     else:
-        await callback.message.answer("❌ Файл marketing_manual.pdf не найден.")
+        await callback.message.answer("⚠️ Файл marketing_manual.pdf временно недоступен, но мы работаем над этим.")
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊 Получить таблицу KPI", callback_data="get_kpi")]
+        [InlineKeyboardButton(text="📊 Забрать таблицу KPI", callback_data="get_kpi")]
     ])
-    await callback.message.answer("Готов получить таблицу KPI? 👇", reply_markup=kb)
-
-    user_state[callback.from_user.id]["last_material"] = datetime.now()
+    await callback.message.answer(TEXT_MANUAL_SENT, reply_markup=kb, parse_mode="Markdown")
 
 @dp.callback_query(F.data == "get_kpi")
 async def send_kpi(callback: types.CallbackQuery):
@@ -55,112 +85,130 @@ async def send_kpi(callback: types.CallbackQuery):
     if os.path.exists(path):
         await callback.message.answer_document(FSInputFile(path), caption="📊 Таблица KPI")
     else:
-        await callback.message.answer("❌ Файл metrika.pdf не найден.")
+        await callback.message.answer("⚠️ Файл metrika.pdf не найден.")
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📑 Получить чек-лист", callback_data="get_checklist")]
     ])
-    await callback.message.answer("Дальше чек-лист 👇", reply_markup=kb)
-
-    user_state[callback.from_user.id]["last_material"] = datetime.now()
+    await callback.message.answer(TEXT_KPI_SENT, reply_markup=kb, parse_mode="Markdown")
 
 @dp.callback_query(F.data == "get_checklist")
 async def send_checklist(callback: types.CallbackQuery):
     path = "check_list.pdf"
     if os.path.exists(path):
-        await callback.message.answer_document(FSInputFile(path), caption="📑 Чек-лист «Проверка кампании»")
+        await callback.message.answer_document(FSInputFile(path), caption="📑 Чек-лист")
     else:
-        await callback.message.answer("❌ Файл check_list.pdf не найден.")
+        await callback.message.answer("⚠️ Файл check_list.pdf не найден.")
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎥 Получить видеоурок", callback_data="get_video")]
+        [InlineKeyboardButton(text="🎥 Смотреть видеоурок", callback_data="get_video")]
     ])
-    await callback.message.answer("А теперь видео 👇", reply_markup=kb)
-
-    user_state[callback.from_user.id]["last_material"] = datetime.now()
+    await callback.message.answer(TEXT_CHECKLIST_SENT, reply_markup=kb, parse_mode="Markdown")
 
 @dp.callback_query(F.data == "get_video")
 async def send_video(callback: types.CallbackQuery):
     VIDEO_URL = "https://youtu.be/P-3NZnicpbk"
-
-    await callback.message.answer(
-        "🎥 Видео урок готов!\nСмотри внимательно. Удачи в запуске первой рекламной кампании!"
-    )
-
+    
+    # Отправляем видео
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎥 Смотреть урок", url=VIDEO_URL)]
+        [InlineKeyboardButton(text="▶️ СМОТРЕТЬ УРОК", url=VIDEO_URL)]
     ])
-    await callback.message.answer("Нажми, чтобы открыть видео 👇", reply_markup=kb)
+    await callback.message.answer(TEXT_VIDEO_SENT, reply_markup=kb, parse_mode="Markdown")
 
     username = f"@{callback.from_user.username}" if callback.from_user.username else callback.from_user.full_name
-    await bot.send_message(NOTIFY_CHAT_ID, f"🎬 Пользователь открыл видео: {username} (ID: {callback.from_user.id})")
+    await bot.send_message(NOTIFY_CHAT_ID, f"🎬 Лид смотрит видео: {username} (ID: {callback.from_user.id})")
 
-    # Через 2 часа кнопка запуска квиза
-    user_state[callback.from_user.id]["quiz_ready_at"] = datetime.now() + timedelta(hours=2)
+    # ЗАПУСК ФОНОВОЙ ЗАДАЧИ: Таймер на 2 часа
+    # asyncio.create_task позволяет коду идти дальше, не блокируя бота,
+    # пока таймер тикает в фоне для конкретного юзера.
+    asyncio.create_task(delayed_quiz_offer(callback.message.chat.id))
+
+async def delayed_quiz_offer(chat_id: int):
+    """Функция ожидания и отправки приглашения на квиз"""
+    await asyncio.sleep(2 * 60 * 60) # Ждем 2 часа (7200 секунд)
+    
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🧠 ПРОЙТИ РАЗБОР", callback_data="start_quiz")]
+    ])
+    
+    try:
+        await bot.send_message(chat_id, TEXT_QUIZ_OFFER, reply_markup=kb, parse_mode="Markdown")
+    except Exception as e:
+        print(f"Не удалось отправить отложенное сообщение пользователю {chat_id}: {e}")
+
+# --- Логика Квиза ---
 
 @dp.callback_query(F.data == "start_quiz")
 async def quiz_start(callback: types.CallbackQuery):
-    await callback.message.answer("🧠 Вопрос 1: В какой нише вы работаете?")
-    user_state[callback.from_user.id]["quiz_step"] = 1
+    await callback.message.answer("1️⃣ **Вопрос 1:** В какой нише вы работаете?", parse_mode="Markdown")
+    user_state[callback.from_user.id] = {"quiz_step": 1}
+    
+    username = f"@{callback.from_user.username}" if callback.from_user.username else callback.from_user.full_name
+    await bot.send_message(NOTIFY_CHAT_ID, f"🧠 Лид начал квиз: {username}")
 
 @dp.message(F.text)
 async def quiz_flow(message: types.Message):
     uid = message.from_user.id
 
-    # Кнопка появления квиза через 2 часа после видео
-    if uid in user_state and "quiz_ready_at" in user_state[uid]:
-        if datetime.now() >= user_state[uid]["quiz_ready_at"]:
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🧠 Пройти квиз", callback_data="start_quiz")]
-            ])
-            await message.answer(
-                "Уже отсмотрел материалы? 🔥\n"
-                "Давай я помогу запустить тебе самую эффективную рекламу.\n"
-                "Жми сюда 👇",
-                reply_markup=kb
-            )
-            del user_state[uid]["quiz_ready_at"]
-
-    # Ниже — логика прохождения квиза
     if uid not in user_state or "quiz_step" not in user_state[uid]:
+        # Если пользователь пишет просто так, можно вернуть его в воронку или проигнорировать
         return
 
     step = user_state[uid]["quiz_step"]
 
     if step == 1:
         user_state[uid]["niche"] = message.text
-        await message.answer("🧠 Вопрос 2: Какая цель вашей рекламы?")
+        await message.answer("2️⃣ **Вопрос 2:** Какая ГЛАВНАЯ цель вашей рекламы сейчас?", parse_mode="Markdown")
         user_state[uid]["quiz_step"] = 2
+        
     elif step == 2:
         user_state[uid]["goal"] = message.text
-        await message.answer("🧠 Вопрос 3: Какой у вас опыт в рекламе?")
+        await message.answer("3️⃣ **Вопрос 3:** Какой у вас опыт в рекламе? (Новичок / Сливал бюджет / Профи)", parse_mode="Markdown")
         user_state[uid]["quiz_step"] = 3
+        
     elif step == 3:
         user_state[uid]["experience"] = message.text
-        await message.answer("🧠 Вопрос 4: Где планируете запускаться?")
+        await message.answer("4️⃣ **Вопрос 4:** На какой площадке планируете запускаться? (VK / Яндекс / Telegram / Другое)", parse_mode="Markdown")
         user_state[uid]["quiz_step"] = 4
+        
     elif step == 4:
         user_state[uid]["platform"] = message.text
 
+        # Сбор ответов для менеджера
+        answers = (
+            f"Ниша: {user_state[uid].get('niche')}\n"
+            f"Цель: {user_state[uid].get('goal')}\n"
+            f"Опыт: {user_state[uid].get('experience')}\n"
+            f"Площадка: {user_state[uid].get('platform')}"
+        )
+
         username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
-        await bot.send_message(NOTIFY_CHAT_ID, f"📨 Завершил квиз, идёт к менеджеру: {username} (ID: {message.from_user.id})")
+        
+        # Отправка заявки менеджеру
+        await bot.send_message(
+            NOTIFY_CHAT_ID, 
+            f"✅ **КВИЗ ЗАВЕРШЕН!**\n👤: {username} (ID: {uid})\n\n📄 **Ответы:**\n{answers}"
+        )
 
         kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📩 Получить разбор", url="https://t.me/bery_lydu")]
+            [InlineKeyboardButton(text="📩 ЗАБРАТЬ РАЗБОР", url="https://t.me/bery_lydu")]
         ])
 
         await message.answer(
-            "🔥 Отлично! На основе твоих ответов мы можем подготовить персональный разбор твоей рекламной стратегии.\n"
-            "Нажми на кнопку ниже и напиши менеджеру, чтобы получить бесплатный разбор 👇",
-            reply_markup=kb
+            "🔥 **Спасибо! Я проанализировал твои ответы.**\n\n"
+            "Мы подготовили стратегию специально под твою нишу.\n"
+            "Нажми кнопку ниже, напиши менеджеру **«РАЗБОР»**, и мы бесплатно обсудим твой запуск! 👇",
+            reply_markup=kb,
+            parse_mode="Markdown"
         )
 
-        del user_state[uid]["quiz_step"]
+        # Очистка состояния
+        if uid in user_state:
+            del user_state[uid]
 
 async def main():
+    print("Бот запущен...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
