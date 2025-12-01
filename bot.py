@@ -2,25 +2,28 @@ import os
 import asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.enums import ChatAction # <-- Новый импорт для имитации печати
-import logging # <-- Добавляем логирование для отладки
+from aiogram.types import (
+    FSInputFile,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
+from aiogram.enums import ChatAction 
+import logging
 
-# Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
 
-# ВАЖНО: Смените токен в BotFather, так как старый был скомпрометирован
-BOT_TOKEN = "8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0" 
-
+BOT_TOKEN = "8324054424:AAFsS1eHNEom5XpTO3dM2U-NdFIaVkZERX0"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 NOTIFY_CHAT_ID = -1003322951241
 
-# Хранилище состояний
 user_state = {}
 
-# --- Тексты для высокой конверсии ---
+# ================== ТЕКСТЫ ==================
+
 TEXT_WELCOME = (
     "👋 **Привет! Это Артём и команда Foton Plus.**\n\n"
     "Мы не льем воду, мы даем инструменты, которые приносят деньги. 💸\n"
@@ -59,42 +62,58 @@ TEXT_QUIZ_OFFER = (
     "Ответь на 4 простых вопроса, и мы составим план действий конкретно для тебя. 👇"
 )
 
-# --- Хендлеры ---
+# ================== ГЛАВНОЕ МЕНЮ ==================
+
+main_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📘 Получить мануал")],
+        [KeyboardButton(text="📊 KPI таблица")],
+        [KeyboardButton(text="📑 Чек-лист")],
+        [KeyboardButton(text="🎥 Смотреть видео")],
+        [KeyboardButton(text="❓ Задать вопрос")],
+        [KeyboardButton(text="🚀 Тарифы")],
+    ],
+    resize_keyboard=True
+)
+
+# ================== ХЕНДЛЕРЫ ==================
 
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
-    # Имитация печати
-    await bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
-    await asyncio.sleep(0.5) 
-    
+
+    await bot.send_chat_action(message.chat.id, ChatAction.TYPING)
+    await asyncio.sleep(0.5)
+
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📘 Скачать мануал", callback_data="get_manual")]
     ])
     await message.answer(TEXT_WELCOME, reply_markup=kb, parse_mode="Markdown")
 
+    await message.answer("👇 Главное меню:", reply_markup=main_menu)
+
     try:
         username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
         await bot.send_message(NOTIFY_CHAT_ID, f"🔥 Новый лид: {username} (ID: {message.from_user.id})")
     except Exception as e:
-        logging.error(f"Ошибка отправки уведомления о старте: {e}")
+        logging.error(f"Ошибка уведомления: {e}")
+
+# ----------- МАНУАЛ --------------
 
 @dp.callback_query(F.data == "get_manual")
 async def send_manual(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
     
-    # Имитация печати перед документом
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
     await asyncio.sleep(0.5)
 
     path = "marketing_manual.pdf"
     if os.path.exists(path):
         await callback.message.answer_document(FSInputFile(path), caption="📘 Твой мануал")
     else:
-        await callback.message.answer("⚠️ Файл marketing_manual.pdf временно недоступен, но мы работаем над этим.")
+        await callback.message.answer("⚠️ Файл marketing_manual.pdf временно недоступен.")
 
-    # Имитация печати перед вторым сообщением
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
     await asyncio.sleep(0.7)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -102,13 +121,14 @@ async def send_manual(callback: types.CallbackQuery):
     ])
     await callback.message.answer(TEXT_MANUAL_SENT, reply_markup=kb, parse_mode="Markdown")
 
+# ----------- KPI --------------
+
 @dp.callback_query(F.data == "get_kpi")
 async def send_kpi(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
 
-    # Имитация печати перед документом
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
     await asyncio.sleep(0.5)
 
     path = "metrika.pdf"
@@ -116,9 +136,8 @@ async def send_kpi(callback: types.CallbackQuery):
         await callback.message.answer_document(FSInputFile(path), caption="📊 Таблица KPI")
     else:
         await callback.message.answer("⚠️ Файл metrika.pdf не найден.")
-    
-    # Имитация печати перед вторым сообщением
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
     await asyncio.sleep(0.7)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -126,13 +145,14 @@ async def send_kpi(callback: types.CallbackQuery):
     ])
     await callback.message.answer(TEXT_KPI_SENT, reply_markup=kb, parse_mode="Markdown")
 
+# ----------- CHECKLIST --------------
+
 @dp.callback_query(F.data == "get_checklist")
 async def send_checklist(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
 
-    # Имитация печати перед документом
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
     await asyncio.sleep(0.5)
     
     path = "check_list.pdf"
@@ -141,8 +161,7 @@ async def send_checklist(callback: types.CallbackQuery):
     else:
         await callback.message.answer("⚠️ Файл check_list.pdf не найден.")
 
-    # Имитация печати перед вторым сообщением
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
     await asyncio.sleep(0.8)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -150,14 +169,15 @@ async def send_checklist(callback: types.CallbackQuery):
     ])
     await callback.message.answer(TEXT_CHECKLIST_SENT, reply_markup=kb, parse_mode="Markdown")
 
+# ----------- VIDEO --------------
+
 @dp.callback_query(F.data == "get_video")
 async def send_video(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
     VIDEO_URL = "https://youtu.be/P-3NZnicpbk"
     
-    # Имитация печати
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
     await asyncio.sleep(1.0) 
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -168,14 +188,11 @@ async def send_video(callback: types.CallbackQuery):
     username = f"@{callback.from_user.username}" if callback.from_user.username else callback.from_user.full_name
     await bot.send_message(NOTIFY_CHAT_ID, f"🎬 Лид смотрит видео: {username} (ID: {callback.from_user.id})")
 
-    # ЗАПУСК ФОНОВОЙ ЗАДАЧИ: Таймер на 2 часа
     asyncio.create_task(delayed_quiz_offer(callback.message.chat.id))
 
 async def delayed_quiz_offer(chat_id: int):
-    """Функция ожидания и отправки приглашения на квиз (без имитации печати)"""
-    # Этот таймер остается без имитации печати, чтобы не занимать ресурсы
-    await asyncio.sleep(2 * 60 * 60) # Ждем 2 часа (7200 секунд)
-    
+    await asyncio.sleep(2 * 60 * 60)
+
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🧠 ПРОЙТИ РАЗБОР", callback_data="start_quiz")]
     ])
@@ -183,22 +200,21 @@ async def delayed_quiz_offer(chat_id: int):
     try:
         await bot.send_message(chat_id, TEXT_QUIZ_OFFER, reply_markup=kb, parse_mode="Markdown")
     except Exception as e:
-        logging.error(f"Не удалось отправить отложенное сообщение пользователю {chat_id}: {e}")
+        logging.error(f"Ошибка отправки отложенного сообщения: {e}")
 
-# --- Логика Квиза ---
+# ----------- QUIZ --------------
 
 @dp.callback_query(F.data == "start_quiz")
 async def quiz_start(callback: types.CallbackQuery):
     await callback.answer()
     chat_id = callback.message.chat.id
-    
-    # Имитация печати
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
     await asyncio.sleep(0.5)
 
     await callback.message.answer("1️⃣ **Вопрос 1:** В какой нише вы работаете?", parse_mode="Markdown")
     user_state[callback.from_user.id] = {"quiz_step": 1}
-    
+
     username = f"@{callback.from_user.username}" if callback.from_user.username else callback.from_user.full_name
     await bot.send_message(NOTIFY_CHAT_ID, f"🧠 Лид начал квиз: {username}")
 
@@ -212,9 +228,8 @@ async def quiz_flow(message: types.Message):
 
     step = user_state[uid]["quiz_step"]
 
-    # Имитация печати перед каждым ответом бота
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-    await asyncio.sleep(0.7) 
+    await bot.send_chat_action(chat_id, ChatAction.TYPING)
+    await asyncio.sleep(0.7)
 
     if step == 1:
         user_state[uid]["niche"] = message.text
@@ -234,7 +249,6 @@ async def quiz_flow(message: types.Message):
     elif step == 4:
         user_state[uid]["platform"] = message.text
 
-        # Сбор ответов для менеджера
         answers = (
             f"Ниша: {user_state[uid].get('niche')}\n"
             f"Цель: {user_state[uid].get('goal')}\n"
@@ -243,16 +257,13 @@ async def quiz_flow(message: types.Message):
         )
 
         username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.full_name
-        
-        # Отправка заявки менеджеру
         await bot.send_message(
             NOTIFY_CHAT_ID, 
             f"✅ **КВИЗ ЗАВЕРШЕН!**\n👤: {username} (ID: {uid})\n\n📄 **Ответы:**\n{answers}"
         )
 
-        # Имитация печати перед финальным сообщением
-        await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-        await asyncio.sleep(1.0) 
+        await bot.send_chat_action(chat_id, ChatAction.TYPING)
+        await asyncio.sleep(1.0)
 
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📩 ЗАБРАТЬ РАЗБОР", url="https://t.me/bery_lydu")]
@@ -266,9 +277,54 @@ async def quiz_flow(message: types.Message):
             parse_mode="Markdown"
         )
 
-        # Очистка состояния
-        if uid in user_state:
-            del user_state[uid]
+        del user_state[uid]
+
+# ================== ОБРАБОТЧИКИ ГЛАВНОГО МЕНЮ ==================
+
+@dp.message(F.text == "📘 Получить мануал")
+async def menu_get_manual(message: types.Message):
+    await send_manual(
+        types.CallbackQuery(id="0", from_user=message.from_user, message=message, data="get_manual")
+    )
+
+@dp.message(F.text == "📊 KPI таблица")
+async def menu_get_kpi(message: types.Message):
+    await send_kpi(
+        types.CallbackQuery(id="0", from_user=message.from_user, message=message, data="get_kpi")
+    )
+
+@dp.message(F.text == "📑 Чек-лист")
+async def menu_get_checklist(message: types.Message):
+    await send_checklist(
+        types.CallbackQuery(id="0", from_user=message.from_user, message=message, data="get_checklist")
+    )
+
+@dp.message(F.text == "🎥 Смотреть видео")
+async def menu_video(message: types.Message):
+    await send_video(
+        types.CallbackQuery(id="0", from_user=message.from_user, message=message, data="get_video")
+    )
+
+@dp.message(F.text == "❓ Задать вопрос")
+async def menu_question(message: types.Message):
+    await message.answer(
+        "✉️ Напиши свой вопрос, и менеджер свяжется с тобой.\n"
+        "Или можно перейти в чат сразу:\n👉 https://t.me/bery_lydu"
+    )
+
+@dp.message(F.text == "🚀 Тарифы")
+async def menu_tariffs(message: types.Message):
+    await message.answer(
+        "🚀 **Наши тарифы и услуги:**\n\n"
+        "• Запуск рекламы под ключ — от 19 900 ₽\n"
+        "• Настройка ретаргета — 7 000 ₽\n"
+        "• Полное ведение — от 14 900 ₽/мес\n\n"
+        "Хочешь обсудить? Напиши менеджеру 👇\n"
+        "https://t.me/bery_lydu",
+        parse_mode="Markdown"
+    )
+
+# ================== СТАРТ БОТА ==================
 
 async def main():
     logging.info("Бот запущен...")
